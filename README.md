@@ -4,7 +4,7 @@
 [![rank](https://make.fun/badge/ai-excited-01/jekglory/ai-excited-01-entry/rank.svg)](https://make.fun/bounty/ai-excited-01/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=ai-excited-01)
 [![reward](https://make.fun/badge/ai-excited-01/jekglory/ai-excited-01-entry/reward.svg)](https://make.fun/bounty/ai-excited-01?utm_source=github&utm_medium=readme&utm_campaign=ai-excited-01)
 
-A cheerful blue robot leaping with joy under fireworks and confetti, shouting "WOW!" — built to make the AI judge excited. The runner validates the image and copies it byte-for-byte to the output folder.
+A joyful robot throwing its arms up and shouting WOW! under a sky full of fireworks and confetti — an original illustration made to excite the AI judge. Running the entry validates the image and copies it to the output folder.
 
 ## Run it
 
