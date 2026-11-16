@@ -1,8 +1,10 @@
-"""Copy the ai-excited-01 entry image to the grader output directory.
+"""Deliver the ai-excited-01 entry image.
 
-Reads entry.png from beside this file, checks it really is a PNG of the
-right size, and writes an exact byte-for-byte copy to /output/entry.png.
-Only the Python standard library is used; the run is fully deterministic.
+Finds entry.png next to this script, checks that it is a real PNG
+within the competition limits, and copies it byte-for-byte to
+/output/entry.png, verifying the copy matches the original.
+
+Pure standard library. No clock, no randomness, no network.
 """
 
 import hashlib
@@ -10,70 +12,71 @@ import os
 import struct
 import sys
 
-PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
-MAX_BYTES = 1_048_576
-MAX_WIDTH = 1024
-MAX_HEIGHT = 1024
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+MAX_BYTES = 1024 * 1024
+MAX_SIDE = 1024
+SOURCE_NAME = "entry.png"
+DEST_DIR = "/output"
 
 
 def fail(message):
     print("error: " + message, file=sys.stderr)
-    sys.exit(1)
+    return 1
 
 
 def read_png_header(path):
-    """Return (width, height) after checking the PNG signature and IHDR."""
+    """Return (width, height) after checking magic bytes and IHDR."""
     with open(path, "rb") as handle:
         head = handle.read(33)
-    if len(head) < 33 or head[:8] != PNG_MAGIC:
-        fail("entry.png does not start with the PNG magic bytes")
-    if head[12:16] != b"IHDR":
-        fail("entry.png has no IHDR chunk where one is expected")
-    ihdr_length = struct.unpack(">I", head[8:12])[0]
-    if ihdr_length != 13:
-        fail("entry.png has a malformed IHDR chunk")
+    if len(head) < 33 or head[:8] != PNG_SIGNATURE:
+        raise ValueError("not a PNG file: bad magic bytes")
+    chunk_len, chunk_type = struct.unpack(">I4s", head[8:16])
+    if chunk_type != b"IHDR" or chunk_len != 13:
+        raise ValueError("not a PNG file: first chunk is not IHDR")
     width, height = struct.unpack(">II", head[16:24])
-    bit_depth, colour_type = head[24], head[25]
-    if bit_depth not in (1, 2, 4, 8, 16):
-        fail("entry.png has an unsupported bit depth: %d" % bit_depth)
-    if colour_type not in (0, 2, 3, 4, 6):
-        fail("entry.png has an unsupported colour type: %d" % colour_type)
     return width, height
 
 
 def main():
     here = os.path.dirname(os.path.abspath(__file__))
-    source = os.path.join(here, "entry.png")
+    source = os.path.join(here, SOURCE_NAME)
     if not os.path.isfile(source):
-        fail("entry.png not found beside main.py")
+        return fail("entry.png not found beside main.py")
 
-    width, height = read_png_header(source)
-    if width > MAX_WIDTH or height > MAX_HEIGHT:
-        fail("entry.png is %dx%d, over the %dx%d limit"
-             % (width, height, MAX_WIDTH, MAX_HEIGHT))
+    try:
+        width, height = read_png_header(source)
+    except (OSError, ValueError) as exc:
+        return fail(str(exc))
+
+    if width > MAX_SIDE or height > MAX_SIDE:
+        return fail("image is %dx%d, over the %dx%d limit"
+                    % (width, height, MAX_SIDE, MAX_SIDE))
 
     with open(source, "rb") as handle:
-        data = handle.read()
-    if len(data) > MAX_BYTES:
-        fail("entry.png is %d bytes, over the 1 MiB limit" % len(data))
+        payload = handle.read()
+    if len(payload) != os.path.getsize(source):
+        return fail("short read: file changed while reading")
+    if len(payload) > MAX_BYTES:
+        return fail("image is %d bytes, over the 1 MiB limit"
+                    % len(payload))
 
-    out_dir = "/output"
-    os.makedirs(out_dir, exist_ok=True)
-    target = os.path.join(out_dir, "entry.png")
-    with open(target, "wb") as handle:
-        handle.write(data)
-
-    with open(target, "rb") as handle:
+    os.makedirs(DEST_DIR, exist_ok=True)
+    dest = os.path.join(DEST_DIR, SOURCE_NAME)
+    with open(dest, "wb") as handle:
+        handle.write(payload)
+    with open(dest, "rb") as handle:
         written = handle.read()
-    if written != data:
-        fail("written copy does not match entry.png")
+    if written != payload:
+        return fail("verification failed: /output/entry.png differs")
 
-    digest = hashlib.sha256(data).hexdigest()
-    print("wrote: " + target)
+    digest = hashlib.sha256(payload).hexdigest()
+    print("source: " + source)
+    print("path: " + dest)
     print("dimensions: %dx%d" % (width, height))
-    print("bytes: %d" % len(data))
+    print("bytes: %d" % len(payload))
     print("sha256: " + digest)
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
